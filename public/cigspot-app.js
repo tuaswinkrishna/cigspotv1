@@ -385,6 +385,23 @@ function installClusterSource() {
 function transformMapboxRequest(url, token = "") {
   const accessToken = String(token || "").trim();
   if (!url.startsWith("mapbox://")) {
+    // Mapbox's legacy TileJSON response may contain HTTP tile templates.
+    // Upgrade those before the browser blocks them as mixed content.
+    try {
+      const parsedUrl = new URL(url, window.location.origin);
+      const isMapboxHttpResource =
+        parsedUrl.protocol === "http:" &&
+        (parsedUrl.hostname === "api.mapbox.com" || /^(?:[a-d]\.)?tiles\.mapbox\.com$/i.test(parsedUrl.hostname));
+      if (isMapboxHttpResource) {
+        parsedUrl.protocol = "https:";
+        if (accessToken && parsedUrl.hostname === "api.mapbox.com" && !parsedUrl.searchParams.has("access_token")) {
+          parsedUrl.searchParams.set("access_token", accessToken);
+        }
+        return { url: parsedUrl.toString() };
+      }
+    } catch {
+      // Keep non-URL values unchanged; MapLibre handles them as before.
+    }
     if (accessToken && url.startsWith("https://api.mapbox.com/") && !url.includes("access_token=")) {
       return { url: `${url}${url.includes("?") ? "&" : "?"}access_token=${encodeURIComponent(accessToken)}` };
     }
@@ -404,7 +421,8 @@ function transformMapboxRequest(url, token = "") {
     apiUrl = `https://api.mapbox.com/styles/v1/${resource.slice("styles/".length)}`;
   } else {
     const tileJsonPath = resource.endsWith(".json") ? resource : `${resource}.json`;
-    apiUrl = `https://api.mapbox.com/v4/${tileJsonPath}`;
+    // Without `secure`, Mapbox TileJSON can return http:// tile templates.
+    apiUrl = `https://api.mapbox.com/v4/${tileJsonPath}?secure`;
   }
 
   return {
