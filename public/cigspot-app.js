@@ -226,10 +226,7 @@ function addSpotLayers() {
   const map = state.map;
   if (map.getLayer("spot-pins")) map.removeLayer("spot-pins");
   if (map.getSource("spots")) map.removeSource("spots");
-  const tileTemplate = new URL(
-    `/tiles/spots/{z}/{x}/{y}.pbf?v=${state.mvtVersion}`,
-    window.location.origin,
-  ).toString();
+  const tileTemplate = `${window.location.origin}/tiles/spots/{z}/{x}/{y}.pbf?v=${state.mvtVersion}`;
   map.addSource("spots", {
     type: "vector",
     promoteId: "id",
@@ -385,6 +382,36 @@ function installClusterSource() {
   });
 }
 
+function transformMapboxRequest(url, token = "") {
+  const accessToken = String(token || "").trim();
+  if (!url.startsWith("mapbox://")) {
+    if (accessToken && url.startsWith("https://api.mapbox.com/") && !url.includes("access_token=")) {
+      return { url: `${url}${url.includes("?") ? "&" : "?"}access_token=${encodeURIComponent(accessToken)}` };
+    }
+    return { url };
+  }
+
+  const resource = url.slice("mapbox://".length);
+  let apiUrl;
+  if (resource.startsWith("sprites/")) {
+    const sprite = resource.match(/^sprites\/([^/]+)\/(.+?)(@2x)?\.(json|png)$/);
+    if (!sprite) return { url };
+    const [, owner, styleId, scale = "", extension] = sprite;
+    apiUrl = `https://api.mapbox.com/styles/v1/${owner}/${styleId}/sprite${scale}.${extension}`;
+  } else if (resource.startsWith("fonts/")) {
+    apiUrl = `https://api.mapbox.com/fonts/v1/${resource.slice("fonts/".length)}`;
+  } else if (resource.startsWith("styles/")) {
+    apiUrl = `https://api.mapbox.com/styles/v1/${resource.slice("styles/".length)}`;
+  } else {
+    const tileJsonPath = resource.endsWith(".json") ? resource : `${resource}.json`;
+    apiUrl = `https://api.mapbox.com/v4/${tileJsonPath}`;
+  }
+
+  return {
+    url: `${apiUrl}${apiUrl.includes("?") ? "&" : "?"}access_token=${encodeURIComponent(accessToken)}`,
+  };
+}
+
 async function initMap() {
   const config = await api("/api/config").catch(() => ({ mapStyle: "https://tiles.openfreemap.org/styles/positron" }));
   let mapStyle = config.mapStyle;
@@ -412,6 +439,7 @@ async function initMap() {
     maxZoom: 20,
     attributionControl: true,
     cooperativeGestures: true,
+    transformRequest: (url) => transformMapboxRequest(url, config.mapboxToken),
   });
   state.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
   state.map.on("load", () => {
