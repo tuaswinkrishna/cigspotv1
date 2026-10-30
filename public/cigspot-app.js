@@ -258,7 +258,8 @@ function addSpotLayers() {
     filter: ["!=", ["get", "status"], "hidden"],
     layout: {
       "icon-image": ["concat", "spot-", ["get", "type"], "-", ["get", "status"]],
-      "icon-size": 1.15,
+      "icon-size": 1.6,
+      "icon-padding": 10,
       "icon-anchor": "center",
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
@@ -342,7 +343,7 @@ function mapPopup(spot) {
     <div class="popup-desc">${escapeHtml(spot.type)} · ${escapeHtml(spot.availability || "idk")}</div>
     <div class="popup-hours">${escapeHtml(spot.hours || "Hours not listed")}</div>
     ${spot.description ? `<div class="popup-desc">${escapeHtml(spot.description)}</div>` : ""}
-    <div style="display:flex;align-items:center;gap:7px;margin-top:8px">
+    <div class="map-popup-actions">
       ${voteControls(spot)}
       <button class="comment-pill" data-action="comments" data-id="${id}">▤ ${Number(spot.comment_count || 0)}</button>
       <button class="btn-edit-sm" data-action="details" data-id="${id}">open</button>

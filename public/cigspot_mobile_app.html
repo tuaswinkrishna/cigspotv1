@@ -243,10 +243,10 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid #dce1d9;
+            border: 1px solid #b4231d;
             border-radius: 50%;
-            background: #fff;
-            color: #3d463d;
+            background: #c8322a;
+            color: #fff;
             font-size: 23px;
             line-height: 1;
             cursor: pointer;
@@ -733,14 +733,37 @@
 
         /* Leaflet tweaks */
         .maplibregl-popup-content {
+            position: relative;
+            overflow: visible;
             padding: 0;
+            padding-top: 38px;
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 4px 16px rgba(0,0,0,.16);
         }
         .maplibregl-popup-close-button {
-            font-size: 18px;
-            color: #535c52;
+            position: absolute;
+            top: 6px;
+            right: 7px;
+            z-index: 3;
+            width: 29px;
+            height: 29px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 1px solid #b4231d;
+            border-radius: 50%;
+            background: #c8322a;
+            color: #fff;
+            font-size: 21px;
+            line-height: 1;
+            box-shadow: 0 2px 5px rgba(74, 23, 20, .2);
+        }
+        .maplibregl-popup-close-button:hover,
+        .form-close:hover {
+            background: #a9231d;
+            color: #fff;
         }
         .maplibregl-popup-tip {
             border-top-color: #fff;
@@ -754,8 +777,9 @@
         .map-popup-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-top: 9px;
+            flex-wrap: nowrap;
+            gap: 5px;
+            margin-top: 8px;
         }
         .map-popup-actions button, .map-popup-actions a {
             border: 0;
@@ -766,6 +790,22 @@
             cursor: pointer;
             text-decoration: none;
         }
+        .map-popup-actions .vote-pill-updown,
+        .map-popup-actions .comment-pill,
+        .map-popup-actions .btn-edit-sm {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+        .map-popup-actions .comment-pill {
+            display: inline-flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            min-width: max-content;
+            padding: 3px 6px;
+            line-height: 1;
+        }
+        .map-popup-actions .btn-edit-sm { padding: 3px 6px; }
         .content-dialog {
             display: none;
             position: absolute;
@@ -778,23 +818,34 @@
         }
         .content-dialog.active { display: flex; }
         .content-dialog-card {
+            position: relative;
             display: flex;
             flex-direction: column;
             gap: 10px;
             width: 100%;
             max-height: 85%;
             overflow-y: auto;
-            padding: 18px;
+            padding: 52px 18px 18px;
             border: 1px solid #dce1d9;
             border-radius: 14px;
             background: #f8f9f6;
             box-shadow: 0 12px 32px rgba(34,42,34,.18);
         }
         .dialog-close {
-            align-self: flex-end;
+            position: absolute;
+            top: 11px;
+            right: 11px;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border: 0;
-            background: transparent;
-            font-size: 20px;
+            border-radius: 50%;
+            background: #c8322a;
+            color: #fff;
+            font-size: 21px;
+            line-height: 1;
             cursor: pointer;
         }
         .dialog-entry {
