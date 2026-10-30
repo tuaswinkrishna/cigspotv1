@@ -16,7 +16,7 @@ const state = {
   radiusKm: 1,
   mapFilter: "all",
   sort: "all",
-  photoUrl: "",
+  photoUrls: [],
   mvtVersion: Date.now(),
   clusterTimer: 0,
 };
@@ -96,9 +96,19 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-function voteControls(spot, prefix = "") {
+function getSpotPhotos(spot) {
+  let photos = spot?.photo_urls;
+  if (typeof photos === "string") {
+    try { photos = JSON.parse(photos); } catch { photos = []; }
+  }
+  const photoUrls = Array.isArray(photos) ? photos.filter((url) => typeof url === "string" && url) : [];
+  if (photoUrls.length) return photoUrls.slice(0, 5);
+  return spot?.photo_url ? [spot.photo_url] : [];
+}
+
+function voteControls(spot, className = "") {
   const id = Number(spot.id);
-  return `<div class="vote-pill-updown" aria-label="Community votes">
+  return `<div class="vote-pill-updown ${className}" aria-label="Community votes">
     <button type="button" class="vote-arrow up" data-action="vote" data-id="${id}" data-vote="upvote" aria-label="Upvote">▲</button>
     <span class="vote-count">${score(spot)}</span>
     <button type="button" class="vote-arrow down" data-action="vote" data-id="${id}" data-vote="downvote" aria-label="Downvote">▼</button>
@@ -110,8 +120,9 @@ function statusLabel(status) {
 }
 
 function spotCard(spot) {
-  const image = spot.photo_url
-    ? `<img class="spot-thumb-image" src="${escapeHtml(spot.photo_url)}" alt="">`
+  const firstPhoto = getSpotPhotos(spot)[0];
+  const image = firstPhoto
+    ? `<img class="spot-thumb-image" src="${escapeHtml(firstPhoto)}" alt="">`
     : "";
   const spotName = escapeHtml(spot.name || spot.type);
   return `<article class="spot-card-row" data-spot-card="${Number(spot.id)}">
@@ -334,20 +345,43 @@ function updateClusters() {
   map.getSource("spot-cluster-data")?.setData(data);
 }
 
+function popupHours(hours) {
+  const value = String(hours || "").trim();
+  const match = value.match(/(\d{1,2}\s*(?:AM|PM))\s*(?:to|–|-)\s*(\d{1,2}\s*(?:AM|PM))/i);
+  if (!match) return `<div class="popup-hours">${escapeHtml(value || "Hours not listed")}</div>`;
+  const formatTime = (time) => time.toUpperCase().replace(/\s+/g, " ").replace(/(\d)(AM|PM)/, "$1 $2");
+  return `<div class="popup-hours-row">
+    <div class="popup-hour-box popup-hour-open"><span>opens</span><strong>${escapeHtml(formatTime(match[1]))}</strong></div>
+    <div class="popup-hour-box popup-hour-close"><span>closes</span><strong>${escapeHtml(formatTime(match[2]))}</strong></div>
+  </div>`;
+}
+
 function mapPopup(spot) {
   const id = Number(spot.id);
   const name = escapeHtml(spot.name || spot.type);
-  const image = spot.photo_url ? `<img src="${escapeHtml(spot.photo_url)}" style="width:100%;height:96px;object-fit:cover;border-radius:6px" alt="">` : "";
+  const photos = getSpotPhotos(spot);
+  const image = photos.length
+    ? `<div class="carousel-box">
+        <img class="carousel-img" src="${escapeHtml(photos[0])}" data-carousel-photos="${escapeHtml(JSON.stringify(photos))}" data-carousel-index="0" alt="${name}">
+        ${photos.length > 1 ? `<button type="button" class="carousel-btn prev" data-action="photo-prev" aria-label="Previous photo">‹</button>
+        <button type="button" class="carousel-btn next" data-action="photo-next" aria-label="Next photo">›</button>
+        <span class="carousel-counter">1 / ${photos.length}</span>` : ""}
+      </div>`
+    : "";
   return `<div class="map-popup-content">
     ${image}<div class="popup-title">${name}</div>
     <div class="popup-desc">${escapeHtml(spot.type)} · ${escapeHtml(spot.availability || "idk")}</div>
-    <div class="popup-hours">${escapeHtml(spot.hours || "Hours not listed")}</div>
+    ${popupHours(spot.hours)}
     ${spot.description ? `<div class="popup-desc">${escapeHtml(spot.description)}</div>` : ""}
     <div class="map-popup-actions">
-      ${voteControls(spot)}
-      <button class="comment-pill" data-action="comments" data-id="${id}">▤ ${Number(spot.comment_count || 0)}</button>
-      <button class="btn-edit-sm" data-action="details" data-id="${id}">open</button>
-      <button class="btn-edit-sm" data-action="share" data-id="${id}">share</button>
+      <div class="map-popup-vote-row">
+        ${voteControls(spot, "map-popup-vote")}
+        <button class="comment-pill map-popup-comments" data-action="comments" data-id="${id}" aria-label="Comments">▤ <span>${Number(spot.comment_count || 0)}</span></button>
+      </div>
+      <div class="map-popup-link-row">
+        <button class="btn-edit-sm map-popup-open" data-action="details" data-id="${id}">open</button>
+        <button class="btn-edit-sm map-popup-share" data-action="share" data-id="${id}">share</button>
+      </div>
     </div>
   </div>`;
 }
@@ -495,7 +529,7 @@ async function initMap() {
     const feature = event.features?.[0];
     if (!feature) return;
     const props = feature.properties || {};
-    openSpot({ ...props, id: props.id || feature.id, lng: event.lngLat.lng, lat: event.lngLat.lat }, [event.lngLat.lng, event.lngLat.lat]);
+    void openSpot(Number(props.id || feature.id), [event.lngLat.lng, event.lngLat.lat]);
   });
   state.map.on("click", "spot-clusters", (event) => {
     const feature = state.map.queryRenderedFeatures(event.point, { layers: ["spot-clusters"] })[0];
@@ -562,7 +596,7 @@ function resetForm() {
   $("#form-error").textContent = "";
   $("#photo-name").textContent = "";
   $("#photo-input").value = "";
-  state.photoUrl = "";
+  state.photoUrls = [];
   document.querySelectorAll("#spot-kind-tags .tag-btn").forEach((button, index) => button.classList.toggle("selected", index === 0));
   document.querySelectorAll("#cig-avail-tags .tag-btn").forEach((button, index) => button.classList.toggle("selected", index === 0));
 }
@@ -578,13 +612,14 @@ function updateHoursDisplay() {
   $("#hours-summary").textContent = `${open} to ${close}`;
 }
 
-async function uploadSelectedPhoto() {
-  const file = $("#photo-input").files?.[0];
-  if (!file) return "";
-  const body = new FormData();
-  body.append("file", file);
-  const result = await api("/api/uploads", { method: "POST", body });
-  return result.photoUrl;
+async function uploadSelectedPhotos() {
+  const files = Array.from($("#photo-input").files || []).slice(0, 5);
+  return Promise.all(files.map(async (file) => {
+    const body = new FormData();
+    body.append("file", file);
+    const result = await api("/api/uploads", { method: "POST", body });
+    return result.photoUrl;
+  }));
 }
 
 async function submitNewSpot() {
@@ -594,7 +629,7 @@ async function submitNewSpot() {
   try {
     const kind = $("#spot-kind-tags .selected")?.textContent.trim() || "chai kada";
     const availability = $("#cig-avail-tags .selected")?.textContent.trim() || "idk";
-    state.photoUrl = await uploadSelectedPhoto();
+    state.photoUrls = await uploadSelectedPhotos();
     const spot = await api("/api/spots", {
       method: "POST",
       body: JSON.stringify({
@@ -603,7 +638,7 @@ async function submitNewSpot() {
         availability,
         hours: `${$("#open-time").value} to ${$("#close-time").value}`,
         description: $("#form-description").value.trim(),
-        photoUrl: state.photoUrl,
+        photoUrls: state.photoUrls,
         lat: state.pendingLocation?.lat ?? state.currentLocation.lat,
         lng: state.pendingLocation?.lng ?? state.currentLocation.lng,
       }),
@@ -817,6 +852,21 @@ function showCurrentLocationMarker(location) {
     .addTo(state.map);
 }
 
+function stepCarousel(button, direction) {
+  const carousel = button.closest(".carousel-box");
+  const image = carousel?.querySelector(".carousel-img");
+  if (!image) return;
+  let photos = [];
+  try { photos = JSON.parse(image.dataset.carouselPhotos || "[]"); } catch { return; }
+  if (photos.length < 2) return;
+  const current = Number(image.dataset.carouselIndex || 0);
+  const next = (current + direction + photos.length) % photos.length;
+  image.dataset.carouselIndex = String(next);
+  image.src = photos[next];
+  const counter = carousel.querySelector(".carousel-counter");
+  if (counter) counter.textContent = `${next + 1} / ${photos.length}`;
+}
+
 async function triggerFindNearMe() {
   if (!navigator.geolocation) return showToast("Location is not available in this browser.");
   const button = $(".btn-find-near");
@@ -855,7 +905,12 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const { action, id } = button.dataset;
-  if (action === "new-spot") openAddFormFromMap();
+  if (action === "photo-prev" || action === "photo-next") {
+    event.preventDefault();
+    event.stopPropagation();
+    stepCarousel(button, action === "photo-prev" ? -1 : 1);
+  }
+  else if (action === "new-spot") openAddFormFromMap();
   else if (action === "vote") { event.preventDefault(); event.stopPropagation(); void voteSpot(id, button.dataset.vote); }
   else if (action === "comments") { event.preventDefault(); void openComments(id); }
   else if (action === "share") { event.preventDefault(); void shareSpot(id); }
@@ -869,8 +924,14 @@ $("#dialog-close").addEventListener("click", closeDialog);
 $("#content-dialog").addEventListener("click", (event) => { if (event.target.id === "content-dialog") closeDialog(); });
 $("#photo-button").addEventListener("click", () => $("#photo-input").click());
 $("#photo-input").addEventListener("change", () => {
-  const file = $("#photo-input").files?.[0];
-  $("#photo-name").textContent = file ? file.name : "";
+  const files = Array.from($("#photo-input").files || []);
+  const selected = files.slice(0, 5);
+  if (files.length > 5) showToast("Only the first five photos will be uploaded.");
+  $("#photo-name").textContent = selected.length === 1
+    ? selected[0].name
+    : selected.length
+      ? `${selected.length} photos selected`
+      : "";
 });
 $("#save-spot-button").addEventListener("click", () => void submitNewSpot());
 $("#sort-controls").addEventListener("click", (event) => {

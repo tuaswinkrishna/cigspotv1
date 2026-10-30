@@ -256,7 +256,7 @@ app.get("/api/spots/nearby", async (request, reply) => {
   if (cached) return JSON.parse(cached);
 
   const result = await pool.query(
-    `SELECT s.id, s.name, s.type, s.availability, s.hours, s.description, s.photo_url,
+    `SELECT s.id, s.name, s.type, s.availability, s.hours, s.description, s.photo_url, s.photo_urls,
             s.trust_score, s.upvote_count, s.downvote_count, s.status,
             ST_Y(s.location::geometry) AS lat, ST_X(s.location::geometry) AS lng,
             ST_Distance(s.location, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) AS distance_meters,
@@ -281,7 +281,7 @@ app.get("/api/spots/:id", async (request, reply) => {
   const query = request.query as { clientId?: string };
   const clientId = validClientId(query.clientId);
   const result = await pool.query(
-    `SELECT s.id, s.name, s.type, s.availability, s.hours, s.description, s.photo_url,
+    `SELECT s.id, s.name, s.type, s.availability, s.hours, s.description, s.photo_url, s.photo_urls,
             s.trust_score, s.upvote_count, s.downvote_count, s.status,
             ST_Y(s.location::geometry) AS lat, ST_X(s.location::geometry) AS lng,
             (SELECT COUNT(*)::int FROM comments c WHERE c.spot_id = s.id) AS comment_count,
@@ -307,17 +307,23 @@ app.post("/api/spots", async (request, reply) => {
     return reply.code(400).send({ error: "Name, category, availability, and valid coordinates are required." });
   }
 
-  const photoUrl = text(body.photoUrl, 500);
-  if (photoUrl && !/^\/api\/uploads\/[0-9a-f-]{36}\.(jpg|png|webp|gif)$/i.test(photoUrl)) {
-    return reply.code(400).send({ error: "Choose a photo uploaded by this app." });
+  if (body.photoUrls !== undefined && !Array.isArray(body.photoUrls)) {
+    return reply.code(400).send({ error: "Upload up to five photos." });
   }
+  const submittedPhotoUrls = Array.isArray(body.photoUrls) ? body.photoUrls : body.photoUrl ? [body.photoUrl] : [];
+  if (submittedPhotoUrls.length > 5) return reply.code(400).send({ error: "You can add up to five photos per spot." });
+  const photoUrls = submittedPhotoUrls.map((url) => text(url, 500)).filter(Boolean);
+  if (photoUrls.some((url) => !/^\/api\/uploads\/[0-9a-f-]{36}\.(jpg|png|webp|gif)$/i.test(url))) {
+    return reply.code(400).send({ error: "Choose photos uploaded by this app." });
+  }
+  const photoUrl = photoUrls[0] || "";
   const result = await pool.query(
-    `INSERT INTO spots (name, type, availability, hours, description, location, photo_url)
-     VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8)
-     RETURNING id, name, type, availability, hours, description, photo_url,
+    `INSERT INTO spots (name, type, availability, hours, description, location, photo_url, photo_urls)
+     VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, $8, $9::jsonb)
+     RETURNING id, name, type, availability, hours, description, photo_url, photo_urls,
                trust_score, upvote_count, downvote_count, status, created_at,
                ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng`,
-    [name, type, availability, hours, description, lng, lat, photoUrl || null],
+    [name, type, availability, hours, description, lng, lat, photoUrl || null, JSON.stringify(photoUrls)],
   );
   await invalidateSpotCaches();
   return reply.code(201).send(result.rows[0]);
