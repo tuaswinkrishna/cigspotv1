@@ -24,6 +24,11 @@ const hashSecret = process.env.COMMENT_HASH_SECRET ?? "local-development-change-
 const uploadDirectory = path.resolve(process.cwd(), "uploads");
 const allowedTypes = new Set(["chai kada", "scenic pause", "shop"]);
 const allowedAvailability = new Set(["imported only", "local only", "idk"]);
+const commentDisplayNames = [
+  "Anu", "Amal", "Anagha", "Arjun", "Athira", "Akhil", "Devika", "Diya", "Fathima", "Gopika",
+  "Hari", "Irfan", "Jishnu", "Kannan", "Lakshmi", "Manu", "Meera", "Nikhil", "Nila", "Neeraj",
+  "Rahul", "Riya", "Sreya", "Sreehari", "Vivek", "Aswathy", "Midhun", "Parvathy", "Abhinav", "Nandana",
+];
 
 const pool = new Pool({ connectionString: databaseUrl, max: 12 });
 const redis = new Redis(redisUrl, { maxRetriesPerRequest: 2, connectTimeout: 5000 });
@@ -68,6 +73,14 @@ function validClientId(value: unknown): string | null {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ? id : null;
 }
 
+function commentDisplayName(clientId: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < clientId.length; index += 1) {
+    hash = Math.imul(hash ^ clientId.charCodeAt(index), 16777619);
+  }
+  return commentDisplayNames[(hash >>> 0) % commentDisplayNames.length];
+}
+
 function spotId(request: FastifyRequest): number | null {
   const params = request.params as { id?: string };
   const value = Number(params.id);
@@ -107,6 +120,7 @@ async function invalidateSpotCaches() {
   await Promise.all([
     deleteRedisPattern("tile:spots:*").catch((error) => app.log.error(error, "tile cache invalidation failed")),
     deleteRedisPattern("nearby:*").catch((error) => app.log.error(error, "nearby cache invalidation failed")),
+    redis.del("stats:spot-count").catch((error) => app.log.error(error, "spot count cache invalidation failed")),
   ]);
 }
 
@@ -168,6 +182,17 @@ app.get("/api/config", async () => ({
     ? `https://api.mapbox.com/styles/v1/mapbox/light-v11?access_token=${encodeURIComponent(process.env.MAPBOX_ACCESS_TOKEN)}`
     : "https://tiles.openfreemap.org/styles/positron",
 }));
+
+app.get("/api/stats", async () => {
+  const cacheKey = "stats:spot-count";
+  const cached = await redis.get(cacheKey);
+  if (cached !== null) return { totalSpots: Number(cached) };
+
+  const result = await pool.query("SELECT COUNT(*)::int AS total FROM spots WHERE status <> 'hidden'");
+  const totalSpots = Number(result.rows[0]?.total ?? 0);
+  await redis.set(cacheKey, String(totalSpots), "EX", 60);
+  return { totalSpots };
+});
 
 app.get("/tiles/spots/:z/:x/:y.pbf", async (request, reply) => {
   const params = request.params as { z: string; x: string; y: string };
@@ -316,10 +341,15 @@ app.get("/api/spots/:id/comments", async (request, reply) => {
   const id = spotId(request);
   if (!id) return reply.code(400).send({ error: "Invalid spot id" });
   const result = await pool.query(
-    "SELECT id, spot_id, content, created_at FROM comments WHERE spot_id = $1 ORDER BY created_at DESC LIMIT 100",
+    "SELECT id, spot_id, content, client_id, created_at FROM comments WHERE spot_id = $1 ORDER BY created_at DESC LIMIT 100",
     [id],
   );
-  return { comments: result.rows };
+  return {
+    comments: result.rows.map(({ client_id: clientId, ...comment }) => ({
+      ...comment,
+      display_name: commentDisplayName(String(clientId)),
+    })),
+  };
 });
 
 app.post("/api/spots/:id/comments", async (request, reply) => {

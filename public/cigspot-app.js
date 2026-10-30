@@ -7,10 +7,12 @@ const mapStart = { lng: 76.2673, lat: 9.9312 };
 const state = {
   map: null,
   popup: null,
+  currentLocationMarker: null,
   pendingLocation: null,
   currentLocation: mapStart,
   selectedSpot: null,
   spots: [],
+  totalSpotCount: null,
   radiusKm: 1,
   mapFilter: "all",
   sort: "all",
@@ -143,10 +145,24 @@ function filteredSortedSpots() {
 function renderNearby() {
   const container = $("#nearest-list-container");
   const spots = filteredSortedSpots();
-  $("#spot-count-badge").textContent = `spot ${state.spots.length}`;
   container.innerHTML = spots.length
     ? spots.map(spotCard).join("")
     : `<div class="empty-state">No spots in this area yet. Tap the map to pass one on.</div>`;
+}
+
+function renderSpotCount() {
+  const count = state.totalSpotCount;
+  $("#spot-count-badge").textContent = Number.isInteger(count) ? `spot ${count}` : "spot —";
+}
+
+async function loadTotalSpotCount() {
+  try {
+    const result = await api("/api/stats");
+    state.totalSpotCount = Number(result.totalSpots);
+    renderSpotCount();
+  } catch {
+    // Keep the existing badge value if the stats request is temporarily unavailable.
+  }
 }
 
 async function loadNearby() {
@@ -242,7 +258,7 @@ function addSpotLayers() {
     filter: ["!=", ["get", "status"], "hidden"],
     layout: {
       "icon-image": ["concat", "spot-", ["get", "type"], "-", ["get", "status"]],
-      "icon-size": 0.9,
+      "icon-size": 1.15,
       "icon-anchor": "center",
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
@@ -330,6 +346,7 @@ function mapPopup(spot) {
       ${voteControls(spot)}
       <button class="comment-pill" data-action="comments" data-id="${id}">▤ ${Number(spot.comment_count || 0)}</button>
       <button class="btn-edit-sm" data-action="details" data-id="${id}">open</button>
+      <button class="btn-edit-sm" data-action="share" data-id="${id}">share</button>
     </div>
   </div>`;
 }
@@ -593,7 +610,7 @@ async function submitNewSpot() {
     switchView("screen1");
     state.currentLocation = { lat: Number(spot.lat), lng: Number(spot.lng) };
     state.map?.flyTo({ center: [spot.lng, spot.lat], zoom: Math.max(15, state.map.getZoom()) });
-    await Promise.all([loadNearby(), new Promise((resolve) => setTimeout(resolve, 250))]);
+    await Promise.all([loadNearby(), loadTotalSpotCount(), new Promise((resolve) => setTimeout(resolve, 250))]);
     refreshMapTiles();
     showToast("Spot added. Community verification starts now.");
   } catch (error) {
@@ -619,7 +636,7 @@ async function voteSpot(id, action) {
     else if (outcome.status === "hidden") showToast("This spot was hidden after community feedback.");
     else showToast(action === "flag" ? "Thanks. Your report was counted." : "Your vote was counted.");
     if (state.popup && state.selectedSpot?.id == id) state.popup.setHTML(mapPopup(state.selectedSpot));
-    await loadNearby();
+    await Promise.all([loadNearby(), loadTotalSpotCount()]);
   } catch (error) { showToast(error.message); }
 }
 
@@ -637,7 +654,7 @@ async function openComments(id) {
       const list = $("#comment-list");
       if (!list) return;
       list.innerHTML = result.comments.length
-        ? result.comments.map((comment) => `<div class="dialog-entry">${escapeHtml(comment.content)}<small>${escapeHtml(formatDate(comment.created_at))}</small></div>`).join("")
+        ? result.comments.map((comment) => `<div class="dialog-entry">${escapeHtml(comment.content)}<small>${escapeHtml(comment.display_name || "Local friend")} · ${escapeHtml(formatDate(comment.created_at))}</small></div>`).join("")
         : `<div class="empty-state">No comments yet.</div>`;
     } catch (error) { if ($("#comment-list")) $("#comment-list").innerHTML = `<div class="form-error">${escapeHtml(error.message)}</div>`; }
   };
@@ -734,6 +751,71 @@ async function focusSpot(id) {
   await openSpot(spot, [Number(spot.lng), Number(spot.lat)]);
 }
 
+function mapsLinkForSpot(spot) {
+  const lat = Number(spot.lat);
+  const lng = Number(spot.lng);
+  const name = String(spot.name || spot.type || "Cigspot");
+  const isAppleDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isAppleDevice) {
+    return {
+      app: "Apple Maps",
+      url: `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(name)}`,
+    };
+  }
+  return {
+    app: "Google Maps",
+    url: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+  };
+}
+
+async function shareSpot(id) {
+  let spot = state.spots.find((item) => Number(item.id) === Number(id)) || state.selectedSpot;
+  if (
+    !spot
+    || Number(spot.id) !== Number(id)
+    || !Number.isFinite(Number(spot.lat))
+    || !Number.isFinite(Number(spot.lng))
+  ) {
+    try { spot = await api(`/api/spots/${Number(id)}?clientId=${encodeURIComponent(currentDeviceId)}`); }
+    catch (error) { showToast(error.message); return; }
+  }
+  const lat = Number(spot.lat);
+  const lng = Number(spot.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return showToast("This spot has no map location to share.");
+  const mapLink = mapsLinkForSpot(spot);
+  const name = String(spot.name || spot.type || "Cigspot");
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: name, text: `Find ${name} on ${mapLink.app}`, url: mapLink.url });
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(mapLink.url);
+    showToast(`${mapLink.app} link copied.`);
+  } catch {
+    window.prompt(`Copy this ${mapLink.app} link`, mapLink.url);
+  }
+}
+
+function showCurrentLocationMarker(location) {
+  if (!state.map) return;
+  if (!state.currentLocationMarker) {
+    const element = document.createElement("div");
+    element.className = "current-location-marker";
+    element.setAttribute("role", "img");
+    element.setAttribute("aria-label", "Your current location");
+    element.title = "Your current location";
+    state.currentLocationMarker = new maplibregl.Marker({ element, anchor: "center" });
+  }
+  state.currentLocationMarker
+    .setLngLat([location.lng, location.lat])
+    .addTo(state.map);
+}
+
 async function triggerFindNearMe() {
   if (!navigator.geolocation) return showToast("Location is not available in this browser.");
   const button = $(".btn-find-near");
@@ -742,6 +824,7 @@ async function triggerFindNearMe() {
   button.textContent = "finding you…";
   navigator.geolocation.getCurrentPosition(async (position) => {
     state.currentLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+    showCurrentLocationMarker(state.currentLocation);
     state.map?.flyTo({ center: [state.currentLocation.lng, state.currentLocation.lat], zoom: 15 });
     await loadNearby();
     $("#nearest-to-you-section").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -774,6 +857,7 @@ document.addEventListener("click", (event) => {
   if (action === "new-spot") openAddFormFromMap();
   else if (action === "vote") { event.preventDefault(); event.stopPropagation(); void voteSpot(id, button.dataset.vote); }
   else if (action === "comments") { event.preventDefault(); void openComments(id); }
+  else if (action === "share") { event.preventDefault(); void shareSpot(id); }
   else if (action === "edit") { event.preventDefault(); void openEditProposal(id); }
   else if (action === "details") { event.preventDefault(); void focusSpot(id); }
   else if (action === "focus-spot") { event.preventDefault(); void focusSpot(id); }
@@ -810,4 +894,5 @@ Object.assign(globalThis, {
 });
 
 await initMap();
-await loadNearby();
+await Promise.all([loadNearby(), loadTotalSpotCount()]);
+setInterval(loadTotalSpotCount, 60_000);
