@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIGSPOT Prototype</title>
+    <!-- Leaflet CSS & JS for real interactive wireframe map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #f1f2ee;
+            color: #292e29;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* App Container Framing */
+        .device-wrapper {
+            width: 380px;
+            height: 760px;
+            background: #f8f9f6;
+            border-radius: 20px;
+            box-shadow: 0 16px 34px rgba(30, 38, 30, 0.14);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid #d7dbd4;
+        }
+
+        /* Header */
+        .app-header {
+            background: #f8f9f6;
+            padding: 12px 16px 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e3e6df;
+        }
+
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            border: 1px solid #d5dad2;
+            padding: 2px 5px;
+            font-weight: bold;
+            font-size: 16px;
+            background: #fff;
+            filter: grayscale(1);
+        }
+
+        .logo-title {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
+        .badge-spot {
+            background: #e9ede7;
+            color: #465046;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Content Views */
+        .view-screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            position: relative;
+            overflow-y: auto;
+            background: #f6f7f4;
+        }
+
+        .view-screen.active {
+            display: flex;
+        }
+
+        .form-backdrop {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(40, 46, 40, 0.24);
+        }
+
+        .form-screen.active {
+            position: absolute;
+            z-index: 1001;
+            top: 50%;
+            left: 50%;
+            width: calc(100% - 30px);
+            max-height: calc(100% - 76px);
+            flex: none;
+            display: flex;
+            transform: translate(-50%, -50%);
+            border: 1px solid #dce1d9;
+            border-radius: 16px;
+            box-shadow: 0 12px 32px rgba(34, 42, 34, 0.18);
+        }
+
+        /* SCREEN 1 & 3: MAP CONTAINER */
+        .map-section {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .map-card {
+            background: #eef1ec;
+            border-radius: 20px;
+            overflow: hidden;
+            flex: 1;
+            position: relative;
+            border: 1px solid #dfe3dc;
+            min-height: 400px;
+        }
+
+        #leaflet-map {
+            width: 100%;
+            height: 100%;
+            background: #f0f2ee;
+        }
+
+        /* Filter Pills */
+        .filter-pills {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 12px 0 8px 0;
+        }
+
+        .pill {
+            background: #e9ede7;
+            color: #4b544a;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .pill.active {
+            background: #d9e4d5;
+            color: #344633;
+            font-weight: bold;
+        }
+
+        .btn-find-near {
+            background: #e6ebe3;
+            color: #354135;
+            border: 1px solid #d9e0d6;
+            padding: 12px;
+            width: 70%;
+            margin: 0 auto 12px auto;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        /* SCREEN 2: ADD SPOT FORM OVERLAY */
+        .form-screen {
+            background: #f1f3ef;
+            color: #293129;
+            padding: 20px;
+            flex-direction: column;
+            gap: 14px;
+            overflow-y: auto;
+        }
+
+        .form-screen h2 {
+            font-family: monospace;
+            font-size: 18px;
+            margin-bottom: 2px;
+            color: #343c34;
+            font-weight: normal;
+        }
+
+        .form-label {
+            font-size: 13px;
+            color: #555e54;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #ffffff;
+            border: 1px solid #dce1d9;
+            font-size: 13px;
+            outline: none;
+        }
+
+        select.form-input {
+            appearance: none;
+            text-align: center;
+            color: #414941;
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, transparent 50%, #778174 50%), linear-gradient(135deg, #778174 50%, transparent 50%);
+            background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%;
+            background-size: 4px 4px, 4px 4px;
+            background-repeat: no-repeat;
+            padding-right: 24px;
+        }
+
+        .tag-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tag-btn {
+            background: #ecefea;
+            color: #485047;
+            border: 1px solid #e1e5de;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .tag-btn.selected {
+            background: #dce6d8;
+            color: #314332;
+            border-color: #cbd8c7;
+        }
+
+        .hours-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .hours-col {
+            flex: 1;
+        }
+
+        .hours-col span {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .hours-display {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .upload-box {
+            width: 60px;
+            height: 60px;
+            background: #edf0eb;
+            color: #4a5149;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            cursor: pointer;
+            border: 1px dashed #cbd5c8;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-submit {
+            background: #e1e8dd;
+            color: #354335;
+            padding: 10px 16px;
+            border: 1px solid #d4ddd1;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .btn-cancel {
+            background: #ecefea;
+            color: #5a6258;
+            padding: 10px 16px;
+            border: 1px solid #dfe3dc;
+            cursor: pointer;
+        }
+
+        /* CUSTOM MAP POPUP (SCREEN 3 OVERLAY) */
+        .spot-popup-card {
+            width: 210px;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            position: relative;
+            font-family: Arial, sans-serif;
+        }
+
+        .carousel-box {
+            position: relative;
+            width: 100%;
+            height: 100px;
+            background: #e8ebe5;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .carousel-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .carousel-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.7);
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+
+        .carousel-btn.prev { left: 4px; }
+        .carousel-btn.next { right: 4px; }
+
+        .carousel-counter {
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            font-size: 8px;
+            padding: 1px 4px;
+            border-radius: 4px;
+        }
+
+        .popup-title {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 6px;
+            color: #111;
+        }
+
+        .popup-desc {
+            font-size: 10px;
+            color: #444;
+            margin-top: 2px;
+        }
+
+        .popup-hours {
+            font-size: 9px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .popup-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        .vote-pill {
+            background: #edf0eb;
+            color: #4c554b;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: bold;
+        }
+
+        .vote-pill-updown {
+            background: #f0f2ee;
+            color: #3d463d;
+            border: 1px solid #e1e5de;
+            border-radius: 14px;
+            padding: 2px 5px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-weight: bold;
+            min-width: 64px;
+        }
+
+        .vote-arrow {
+            color: #5d675c;
+            background: transparent;
+            border: none;
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            font-size: 12px;
+            line-height: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .vote-arrow:hover {
+            color: #2e382f;
+            background: #e4e9e2;
+        }
+
+        .vote-arrow.selected.up {
+            color: #527d4f;
+        }
+
+        .vote-arrow.selected.down {
+            color: #626d7c;
+        }
+
+        .vote-count {
+            min-width: 16px;
+            text-align: center;
+            font-size: 10px;
+            line-height: 1;
+        }
+
+        .comment-pill {
+            background: #eff1ed;
+            color: #535c52;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .btn-edit-sm {
+            background: #ecefea;
+            color: #525a51;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        /* SCREEN 4: NEAREST TO YOU LIST */
+        .list-screen {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f6f7f4;
+        }
+
+        .list-header {
+            text-align: center;
+        }
+
+        .list-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .radius-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #e8ede5;
+            padding: 2px 12px;
+            border-radius: 6px;
+        }
+
+        .radius-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .filter-sort-bar {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
+        }
+
+        .sort-chip {
+            background: #e9ece7;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .sort-chip.active {
+            background: #dce6d8;
+            color: #344534;
+        }
+
+        .spot-card-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            background: transparent;
+        }
+
+        .card-thumb-box {
+            width: 75px;
+            height: 75px;
+            background: #e7eae5;
+            position: relative;
+            flex-shrink: 0;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .dist-badge {
+            background: #5a6259;
+            color: #fff;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            padding: 2px 0;
+            font-weight: bold;
+        }
+
+        .card-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .info-line-1 {
+            font-size: 11px;
+            color: #444;
+        }
+
+        .info-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #303730;
+            line-height: 1.1;
+        }
+
+        .tags-row {
+            display: flex;
+            gap: 4px;
+            margin: 2px 0;
+        }
+
+        .badge-verified {
+            color: #5c7c58;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .badge-not-verified {
+            color: #82887f;
+            font-size: 10px;
+        }
+
+        .badge-date {
+            background: #e8ebe6;
+            color: #5c645b;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        .badge-type {
+            background: #ecefea;
+            color: #555d53;
+            font-size: 10px;
+            padding: 1px 4px;
+            display: inline-block;
+            margin-top: 1px;
+        }
+
+        .card-bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .btn-report {
+            background: #ecefea;
+            color: #687066;
+            border: 1px solid #e0e4dd;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: auto;
+        }
+
+        /* Map Pin Custom Markers */
+        .custom-pin {
+            background: #dcebd7;
+            color: #394239;
+            border-radius: 7px;
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(25, 35, 26, 0.18);
+            border: 1px solid #9eac98;
+        }
+
+        .custom-pin.grey {
+            background: #f2f3f0;
+            color: #555d54;
+            border-color: #b9beb6;
+        }
+
+        .pin-glyph {
+            filter: grayscale(1) contrast(1.1);
+            opacity: 0.86;
+        }
+
+        /* Modal Overlay for Adding New Spot Pin on Map */
+        .add-pin-prompt {
+            background: #fff;
+            padding: 6px 10px;
+            border-radius: 20px;
+            border: 1px solid #c9d0c6;
+            color: #414941;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 4px 10px rgba(25, 35, 26, 0.14);
+        }
+
+        /* Leaflet tweaks */
+        .leaflet-popup-content-wrapper {
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+        .leaflet-popup-content {
+            margin: 0;
+        }
+        .leaflet-popup-tip {
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="device-wrapper">
+        <!-- App Header (Screens 1, 3, 4) -->
+        <div class="app-header" id="app-header">
+            <div class="logo-box">
+                <div class="logo-icon">📖</div>
+                <div class="logo-title">CIGSPOT</div>
+            </div>
+            <div class="badge-spot" id="spot-count-badge">spot 3</div>
+        </div>
+
+        <div id="form-backdrop" class="form-backdrop" onclick="switchView('screen1')"></div>
+
+        <!-- SCREEN 1: COMMUNITY MAP (HOME) -->
+        <div id="screen1" class="view-screen active">
+            <div class="map-section">
+                <div style="font-size: 13px; font-weight: bold; margin-bottom: 6px;">community map</div>
+                <div class="map-card">
+                    <div id="leaflet-map"></div>
+                </div>
+                <div class="filter-pills">
+                    <button class="pill active" onclick="filterMap('all')">All</button>
+                    <button class="pill" onclick="filterMap('verified')">Verified</button>
+                    <button class="pill" onclick="filterMap('not-verified')">Not verified</button>
+                </div>
+            </div>
+            <button class="btn-find-near" onclick="triggerFindNearMe()">find near me</button>
+
+            <!-- NEAREST TO YOU, BELOW THE MAP -->
+            <div id="nearest-to-you-section" class="list-screen">
+                <div class="list-header">
+                    <div class="list-title">nearest to you</div>
+                    <div class="radius-control">
+                        <button class="radius-btn" onclick="adjustRadius(-0.5)">-</button>
+                        <span id="radius-val">1km radius</span>
+                        <button class="radius-btn" onclick="adjustRadius(0.5)">+</button>
+                    </div>
+                </div>
+
+                <!-- Sort/Filter row -->
+                <div class="filter-sort-bar">
+                    <button class="sort-chip active">All</button>
+                    <button class="sort-chip">Best Spot</button>
+                    <button class="sort-chip">Most Commended</button>
+                    <button class="sort-chip">Newest</button>
+                </div>
+
+                <!-- Cards Container -->
+                <div id="nearest-list-container" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Dynamically Populated -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: ADD SPOT FORM ("pass it on") MODAL -->
+        <div id="screen2" class="view-screen form-screen">
+            <h2>pass it on</h2>
+
+            <div>
+                <label class="form-label">what should we call it ? (optional)</label>
+                <input type="text" id="form-name" class="form-input" placeholder="e.g. Corner Shop">
+            </div>
+
+            <div>
+                <label class="form-label">what kind of spot? (optional)</label>
+                <div class="tag-group" id="spot-kind-tags">
+                    <button class="tag-btn selected" onclick="toggleTag(this)">chai kada</button>
+                    <button class="tag-btn" onclick="toggleTag(this)">scenic pause</button>
+                    <button class="tag-btn" onclick="toggleTag(this)">shop</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label">cigarette availability (optional)</label>
+                <div class="tag-group" id="cig-avail-tags">
+                    <button class="tag-btn selected" onclick="toggleTag(this)">imported only</button>
+                    <button class="tag-btn" onclick="toggleTag(this)">local only</button>
+                    <button class="tag-btn" onclick="toggleTag(this)">idk</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label">opening hours (optional)</label>
+                <div class="hours-row">
+                    <div class="hours-col">
+                        <span>opens</span>
+                        <select id="open-time" class="form-input" style="text-align: center;" onchange="updateHoursDisplay()">
+                            <option>12 AM</option><option>1 AM</option><option>2 AM</option><option>3 AM</option>
+                            <option>4 AM</option><option>5 AM</option><option>6 AM</option><option>7 AM</option>
+                            <option>8 AM</option><option selected>9 AM</option><option>10 AM</option><option>11 AM</option>
+                            <option>12 PM</option><option>1 PM</option><option>2 PM</option><option>3 PM</option>
+                            <option>4 PM</option><option>5 PM</option><option>6 PM</option><option>7 PM</option>
+                            <option>8 PM</option><option>9 PM</option><option>10 PM</option><option>11 PM</option>
+                        </select>
+                    </div>
+                    <div class="hours-col">
+                        <span>close</span>
+                        <select id="close-time" class="form-input" style="text-align: center;" onchange="updateHoursDisplay()">
+                            <option>12 AM</option><option>1 AM</option><option>2 AM</option><option>3 AM</option>
+                            <option selected>4 AM</option><option>5 AM</option><option>6 AM</option><option>7 AM</option>
+                            <option>8 AM</option><option>9 AM</option><option>10 AM</option><option>11 AM</option>
+                            <option>12 PM</option><option>1 PM</option><option>2 PM</option><option>3 PM</option>
+                            <option>4 PM</option><option>5 PM</option><option>6 PM</option><option>7 PM</option>
+                            <option>8 PM</option><option>9 PM</option><option>10 PM</option><option>11 PM</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="hours-display" id="hours-summary">9AM to 4 AM</div>
+            </div>
+
+            <div>
+                <label class="form-label">photos (optional)</label>
+                <button class="upload-box" onclick="alert('Photo upload dialog simulated')">+</button>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-submit" onclick="submitNewSpot()">SAVE SPOT</button>
+                <button class="btn-cancel" onclick="switchView('screen1')">CANCEL</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: SPOT DETAILS POPUP (Simulated as full view overlay/focused popup) -->
+        <!-- Note: This view also reuses map but automatically opens the card popup -->
+
+    </div>
+
+    <script>
+        // Spot Data
+        let spots = [
+            {
+                id: 1,
+                name: "chai kada",
+                type: "chai kada",
+                lat: 9.9312,
+                lng: 76.2673,
+                verified: true,
+                date: "today",
+                availability: "imported cig only",
+                distance: "300mtr",
+                upvotes: 50,
+                downvotes: 0,
+                comments: 57,
+                hours: "10:00 AM - 11:00 PM",
+                img: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=60"
+            },
+            {
+                id: 2,
+                name: "shop",
+                type: "shop",
+                lat: 9.9340,
+                lng: 76.2690,
+                verified: false,
+                date: "today",
+                availability: "idk",
+                distance: "450 mtr",
+                upvotes: 12,
+                downvotes: 0,
+                comments: 3,
+                hours: "8:00 AM - 10:00 PM",
+                img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&auto=format&fit=crop&q=60"
+            },
+            {
+                id: 3,
+                name: "senic pause",
+                type: "scenic pause",
+                lat: 9.9280,
+                lng: 76.2620,
+                verified: true,
+                date: "yesterday",
+                availability: "imported cig only",
+                distance: "500 mtr",
+                upvotes: 34,
+                downvotes: 0,
+                comments: 8,
+                hours: "24 Hours",
+                img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&auto=format&fit=crop&q=60"
+            },
+            {
+                id: 4,
+                name: "chai kada",
+                type: "chai kada",
+                lat: 9.9250,
+                lng: 76.2710,
+                verified: true,
+                date: "03/11/2025",
+                availability: "local cig only",
+                distance: "700 mtr",
+                upvotes: 89,
+                downvotes: 0,
+                comments: 14,
+                hours: "6:00 AM - 12:00 AM",
+                img: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&auto=format&fit=crop&q=60"
+            }
+        ];
+
+        let map;
+        let mapMarkers = [];
+        let currentRadius = 1.0;
+        let pendingClickLatLng = null;
+        let currentMapFilter = 'all';
+        const userVotes = {};
+
+        function spotEmoji(type) {
+            const category = (type || '').toLowerCase();
+            if (category.includes('chai') || category.includes('tea')) return '☕';
+            if (category.includes('shop')) return '🏪';
+            return '🏖️';
+        }
+
+        function spotScore(spot) {
+            return (spot.upvotes || 0) - (spot.downvotes || 0);
+        }
+
+        function voteButtonsHtml(spot) {
+            const myVote = userVotes[spot.id] || 0;
+            return `
+                <div class="vote-pill-updown" data-vote-buttons="${spot.id}">
+                    <button type="button" class="vote-arrow up ${myVote === 1 ? 'selected' : ''}" onclick="voteSpot(${spot.id}, 1)" aria-label="Upvote">▲</button>
+                    <span class="vote-count" data-vote-score="${spot.id}">${spotScore(spot)}</span>
+                    <button type="button" class="vote-arrow down ${myVote === -1 ? 'selected' : ''}" onclick="voteSpot(${spot.id}, -1)" aria-label="Downvote">▼</button>
+                </div>
+            `;
+        }
+
+        function getMapFilteredSpots() {
+            if (currentMapFilter === 'verified') return spots.filter(s => s.verified);
+            if (currentMapFilter === 'not-verified') return spots.filter(s => !s.verified);
+            return spots;
+        }
+
+        window.onload = function() {
+            initMap();
+            renderNearestList();
+        };
+
+        // Initialize Leaflet Map
+        function initMap() {
+            map = L.map('leaflet-map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([9.9312, 76.2673], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // Handle map click to display "+" prompt to add spot
+            map.on('click', function(e) {
+                pendingClickLatLng = e.latlng;
+                
+                let addPopup = L.popup({ closeButton: false, offset: [0, -10] })
+                    .setLatLng(e.latlng)
+                    .setContent(`
+                        <div class="add-pin-prompt" onclick="openAddFormFromMap()">
+                            <span>new spot</span>
+                            <span style="font-size: 16px; font-weight: bold; background: #e8ede5; color: #435044; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;">+</span>
+                        </div>
+                    `)
+                    .openOn(map);
+            });
+
+            renderMapPins(spots);
+        }
+
+        // Render Pins on Map
+        function renderMapPins(spotsToRender) {
+            // Clear existing
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+
+            spotsToRender.forEach(spot => {
+                let customIcon = L.divIcon({
+                    className: 'custom-pin-wrapper',
+                    html: `<div class="custom-pin ${spot.verified ? '' : 'grey'}" title="${spot.type}"><span class="pin-glyph">${spotEmoji(spot.type)}</span></div>`,
+                    iconSize: [38, 38],
+                    iconAnchor: [19, 19]
+                });
+
+                let marker = L.marker([spot.lat, spot.lng], { icon: customIcon }).addTo(map);
+                marker._spotId = spot.id;
+
+                // Popup content matching Screen 3 UI
+                let popupContent = `
+                    <div class="spot-popup-card">
+                        <div class="carousel-box">
+                            <img src="${spot.img}" class="carousel-img" alt="spot"/>
+                            <span class="carousel-counter">1/2</span>
+                        </div>
+                        <div class="popup-title">${spot.name}</div>
+                        <div class="popup-desc">${spot.type} · ${spot.availability}</div>
+                        <div class="popup-hours">${spot.hours}</div>
+                        <div class="popup-actions">
+                            <div style="display: flex; gap: 4px;">
+                                ${voteButtonsHtml(spot)}
+                                <div class="comment-pill">
+                                    <span>💬</span> <span>${spot.comments}</span>
+                                </div>
+                            </div>
+                            <button class="btn-edit-sm" onclick="alert('Edit spot #${spot.id}')">edit</button>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent, { maxWidth: "auto" });
+                mapMarkers.push(marker);
+            });
+
+            document.getElementById('spot-count-badge').innerText = `spot ${spotsToRender.length}`;
+        }
+
+        // Filter Pins
+        function filterMap(type) {
+            currentMapFilter = type;
+            document.querySelectorAll('.filter-pills .pill').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderMapPins(getMapFilteredSpots());
+        }
+
+        // Open Form from Map click
+        function openAddFormFromMap() {
+            map.closePopup();
+            switchView('screen2');
+        }
+
+        // Screen Switcher
+        function switchView(screenId) {
+            const backdrop = document.getElementById('form-backdrop');
+
+            if (screenId === 'screen2') {
+                document.getElementById('screen1').classList.add('active');
+                document.getElementById('screen2').classList.add('active');
+                backdrop.style.display = 'block';
+            } else {
+                document.querySelectorAll('.view-screen').forEach(s => s.classList.remove('active'));
+                const targetScreen = document.getElementById(screenId);
+                if (targetScreen) targetScreen.classList.add('active');
+                backdrop.style.display = 'none';
+            }
+
+            document.getElementById('app-header').style.display = 'flex';
+
+            if (screenId === 'screen3') {
+                switchView('screen1');
+                if (mapMarkers.length > 0) {
+                    mapMarkers[0].openPopup();
+                }
+                return;
+            }
+
+            // Leaflet resize trigger
+            if (screenId === 'screen1' && map) {
+                setTimeout(() => map.invalidateSize(), 200);
+            }
+        }
+
+        // Form tag select toggle
+        function toggleTag(btn) {
+            let parent = btn.parentElement;
+            parent.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function updateHoursDisplay() {
+            let open = document.getElementById('open-time').value || '';
+            let close = document.getElementById('close-time').value || '';
+            document.getElementById('hours-summary').innerText = `${open} to ${close}`;
+        }
+
+        // Submit spot from Screen 2
+        function submitNewSpot() {
+            let nameInput = document.getElementById('form-name').value.trim() || "new spot";
+            
+            let kind = "chai kada";
+            let kindSelected = document.querySelector('#spot-kind-tags .selected');
+            if (kindSelected) kind = kindSelected.innerText;
+
+            let avail = "local only";
+            let availSelected = document.querySelector('#cig-avail-tags .selected');
+            if (availSelected) avail = availSelected.innerText;
+
+            let open = document.getElementById('open-time').value;
+            let close = document.getElementById('close-time').value;
+
+            let lat = pendingClickLatLng ? pendingClickLatLng.lat : 9.9320 + (Math.random() - 0.5) * 0.01;
+            let lng = pendingClickLatLng ? pendingClickLatLng.lng : 76.2650 + (Math.random() - 0.5) * 0.01;
+
+            let newSpot = {
+                id: spots.length + 1,
+                name: nameInput,
+                type: kind,
+                lat: lat,
+                lng: lng,
+                verified: true,
+                date: "today",
+                availability: avail,
+                distance: "250 mtr",
+                upvotes: 1,
+                downvotes: 0,
+                comments: 0,
+                hours: `${open} - ${close}`,
+                img: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=60"
+            };
+
+            spots.unshift(newSpot);
+            renderMapPins(getMapFilteredSpots());
+            renderNearestList();
+
+            // Clear inputs
+            document.getElementById('form-name').value = '';
+
+            switchView('screen1');
+        }
+
+        // GPS Find Near Me trigger
+        function triggerFindNearMe() {
+            document.getElementById('nearest-to-you-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Adjust Radius in Screen 4
+        function adjustRadius(delta) {
+            currentRadius = Math.max(0.5, currentRadius + delta);
+            document.getElementById('radius-val').innerText = `${currentRadius}km radius`;
+        }
+
+        // Render Screen 4 List
+        function renderNearestList() {
+            let container = document.getElementById('nearest-list-container');
+            container.innerHTML = '';
+
+            spots.forEach(spot => {
+                let card = document.createElement('div');
+                card.className = 'spot-card-row';
+                card.innerHTML = `
+                    <div class="card-thumb-box">
+                        <div class="dist-badge">${spot.distance}</div>
+                    </div>
+                    <div class="card-info">
+                        <div class="info-line-1">name</div>
+                        <div class="info-title">${spot.name}</div>
+                        <div class="tags-row">
+                            <span class="${spot.verified ? 'badge-verified' : 'badge-not-verified'}">
+                                ${spot.verified ? 'verified' : 'not verified'}
+                            </span>
+                            <span class="badge-date">${spot.date}</span>
+                        </div>
+                        <div>
+                            <span class="badge-type">${spot.availability}</span>
+                        </div>
+                        <div class="card-bottom-bar">
+                            ${voteButtonsHtml(spot)}
+                            <div class="comment-pill">
+                                <span>💬</span> <span>${spot.comments}</span>
+                            </div>
+                            <button class="btn-edit-sm" onclick="alert('Edit #${spot.id}')">edit</button>
+                            <button class="btn-report" onclick="alert('Reported spot #${spot.id}')">report</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function voteSpot(id, direction) {
+            let spot = spots.find(s => s.id === id);
+            if (!spot) return;
+
+            const openMarker = mapMarkers.find(marker => marker.isPopupOpen());
+            const openSpotId = openMarker ? openMarker._spotId : null;
+            const previousVote = userVotes[id] || 0;
+
+            if (previousVote === direction) {
+                if (direction === 1) spot.upvotes = Math.max(0, spot.upvotes - 1);
+                if (direction === -1) spot.downvotes = Math.max(0, spot.downvotes - 1);
+                userVotes[id] = 0;
+            } else {
+                if (previousVote === 1) spot.upvotes = Math.max(0, spot.upvotes - 1);
+                if (previousVote === -1) spot.downvotes = Math.max(0, spot.downvotes - 1);
+                if (direction === 1) spot.upvotes++;
+                if (direction === -1) spot.downvotes++;
+                userVotes[id] = direction;
+            }
+
+            renderMapPins(getMapFilteredSpots());
+            renderNearestList();
+
+            if (openSpotId !== null) {
+                const updatedMarker = mapMarkers.find(marker => marker._spotId === openSpotId);
+                if (updatedMarker) updatedMarker.openPopup();
+            }
+        }
+    </script>
+</body>
+</html>
