@@ -226,10 +226,14 @@ function addSpotLayers() {
   const map = state.map;
   if (map.getLayer("spot-pins")) map.removeLayer("spot-pins");
   if (map.getSource("spots")) map.removeSource("spots");
+  const tileTemplate = new URL(
+    `/tiles/spots/{z}/{x}/{y}.pbf?v=${state.mvtVersion}`,
+    window.location.origin,
+  ).toString();
   map.addSource("spots", {
     type: "vector",
     promoteId: "id",
-    tiles: [`/tiles/spots/{z}/{x}/{y}.pbf?v=${state.mvtVersion}`],
+    tiles: [tileTemplate],
     minzoom: 0,
     maxzoom: 22,
   });
