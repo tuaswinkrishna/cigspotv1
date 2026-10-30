@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS spots (
     description VARCHAR(300) NOT NULL DEFAULT '',
     location GEOGRAPHY(POINT, 4326) NOT NULL,
     photo_url TEXT,
-    photo_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
     trust_score INTEGER NOT NULL DEFAULT 0,
     upvote_count INTEGER NOT NULL DEFAULT 0,
     downvote_count INTEGER NOT NULL DEFAULT 0,
@@ -18,11 +17,6 @@ CREATE TABLE IF NOT EXISTS spots (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-ALTER TABLE spots ADD COLUMN IF NOT EXISTS photo_urls JSONB NOT NULL DEFAULT '[]'::jsonb;
-UPDATE spots
-SET photo_urls = jsonb_build_array(photo_url)
-WHERE photo_url IS NOT NULL AND photo_urls = '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS spots_location_gix ON spots USING GIST (location);
 CREATE INDEX IF NOT EXISTS spots_status_idx ON spots (status);
