@@ -2,27 +2,40 @@
   "name": "cigspot",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "dev": "concurrently -k -n API,WEB \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx watch server/index.ts",
+    "dev:web": "next dev",
+    "build": "npm run build:api && next build",
+    "build:api": "tsc -p server/tsconfig.json",
+    "start": "concurrently -k -n API,WEB \"npm:start:api\" \"npm:start:web\"",
+    "start:api": "node dist/server/index.js",
+    "start:web": "next start"
   },
   "dependencies": {
-    "leaflet": "^1.9.4",
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/multipart": "^10.1.6",
+    "dotenv": "^18.0.9",
+    "fastify": "^5.12.7",
+    "ioredis": "^6.0.0",
     "lucide-react": "^0.468.0",
     "next": "^16.4.3",
+    "pg": "^8.23.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-leaflet": "^5.0.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
-    "@types/leaflet": "^1.9.21",
     "@types/node": "^22.13.10",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "concurrently": "^9.2.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.2"
   }
 }

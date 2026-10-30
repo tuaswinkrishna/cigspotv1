@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    container_name: cigspot-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cigspot
+      POSTGRES_USER: cigspot
+      POSTGRES_PASSWORD: cigspot_dev_only
+    ports:
+      - "5433:5432"
+    volumes:
+      - cigspot-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cigspot -d cigspot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: cigspot-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - cigspot-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  cigspot-postgres:
+  cigspot-redis:

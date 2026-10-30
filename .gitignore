@@ -5,3 +5,5 @@ dist/
 .vercel/
 *.tsbuildinfo
 .env*
+!.env.example
+uploads/

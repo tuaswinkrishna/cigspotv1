@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CIGSPOT Prototype",
-  description: "CIGSPOT community map prototype.",
+  title: "CIGSPOT",
+  description: "Find and share community spots near you.",
   applicationName: "CIGSPOT",
 };
 
