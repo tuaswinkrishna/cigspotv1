@@ -387,9 +387,25 @@ function installClusterSource() {
 
 async function initMap() {
   const config = await api("/api/config").catch(() => ({ mapStyle: "https://tiles.openfreemap.org/styles/positron" }));
+  let mapStyle = config.mapStyle;
+  if (typeof mapStyle === "string" && mapStyle.includes("api.mapbox.com/styles/")) {
+    try {
+      const response = await fetch(mapStyle);
+      if (!response.ok) throw new Error(`Map style request failed (${response.status})`);
+      mapStyle = await response.json();
+      // Mapbox styles use projection.name; MapLibre's style spec uses projection.type.
+      if (mapStyle.projection?.name && !mapStyle.projection?.type) {
+        mapStyle.projection.type = mapStyle.projection.name;
+        delete mapStyle.projection.name;
+      }
+    } catch (error) {
+      console.warn("Could not load the configured Mapbox style; using the light fallback.", error);
+      mapStyle = "https://tiles.openfreemap.org/styles/positron";
+    }
+  }
   state.map = new maplibregl.Map({
     container: "map",
-    style: config.mapStyle,
+    style: mapStyle,
     center: [mapStart.lng, mapStart.lat],
     zoom: 13,
     minZoom: 2,
