@@ -189,8 +189,8 @@ function makeIcon(type, status) {
   canvas.width = 44;
   canvas.height = 44;
   const ctx = canvas.getContext("2d");
-  const fill = status === "verified" ? "#e2ebdd" : "#f0f1ee";
-  const border = status === "verified" ? "#b8cbb1" : "#c9cec7";
+  const fill = status === "verified" ? "#e2ebdd" : "#e3edf8";
+  const border = status === "verified" ? "#b8cbb1" : "#9eb8d4";
   ctx.fillStyle = fill;
   ctx.strokeStyle = border;
   ctx.lineWidth = 1.5;

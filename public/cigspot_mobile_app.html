@@ -135,10 +135,15 @@
             top: 50%;
             left: 50%;
             width: calc(100% - 30px);
-            max-height: calc(100% - 76px);
+            height: min(760px, calc(100dvh - 100px));
+            max-height: calc(100% - 48px);
+            min-height: 0;
             flex: none;
             display: flex;
             transform: translate(-50%, -50%);
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
             border: 1px solid #dce1d9;
             border-radius: 16px;
             box-shadow: 0 12px 32px rgba(34, 42, 34, 0.18);
@@ -187,9 +192,29 @@
         }
 
         .pill.active {
-            background: #d9e4d5;
-            color: #344633;
+            background: #e0e5df;
+            color: #374237;
             font-weight: bold;
+        }
+
+        .pill.filter-verified {
+            background: #edf4e9;
+            color: #456543;
+        }
+
+        .pill.filter-verified.active {
+            background: #cfe0c8;
+            color: #345b32;
+        }
+
+        .pill.filter-not-verified {
+            background: #edf3fa;
+            color: #42658b;
+        }
+
+        .pill.filter-not-verified.active {
+            background: #d3e2f2;
+            color: #315a83;
         }
 
         .btn-find-near {
@@ -229,7 +254,7 @@
             align-items: center;
             justify-content: space-between;
             position: sticky;
-            top: -20px;
+            top: 0;
             z-index: 2;
             margin: -20px -20px 0;
             padding: 13px 16px 11px 20px;
@@ -250,6 +275,11 @@
             font-size: 23px;
             line-height: 1;
             cursor: pointer;
+        }
+
+        .form-close:hover {
+            background: #a9231d;
+            color: #fff;
         }
 
         .form-label {
@@ -650,8 +680,11 @@
         }
 
         .badge-not-verified {
-            color: #82887f;
+            color: #42658b;
             font-size: 10px;
+            background: #e4edf8;
+            padding: 1px 4px;
+            border-radius: 3px;
         }
 
         .badge-date {
@@ -733,37 +766,14 @@
 
         /* Leaflet tweaks */
         .maplibregl-popup-content {
-            position: relative;
-            overflow: visible;
             padding: 0;
-            padding-top: 38px;
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 4px 16px rgba(0,0,0,.16);
         }
         .maplibregl-popup-close-button {
-            position: absolute;
-            top: 6px;
-            right: 7px;
-            z-index: 3;
-            width: 29px;
-            height: 29px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-            border: 1px solid #b4231d;
-            border-radius: 50%;
-            background: #c8322a;
-            color: #fff;
-            font-size: 21px;
-            line-height: 1;
-            box-shadow: 0 2px 5px rgba(74, 23, 20, .2);
-        }
-        .maplibregl-popup-close-button:hover,
-        .form-close:hover {
-            background: #a9231d;
-            color: #fff;
+            font-size: 18px;
+            color: #c8322a;
         }
         .maplibregl-popup-tip {
             border-top-color: #fff;
@@ -932,8 +942,8 @@
                 </div>
                 <div class="filter-pills">
                     <button class="pill active" onclick="filterMap('all')">All</button>
-                    <button class="pill" onclick="filterMap('verified')">Verified</button>
-                    <button class="pill" onclick="filterMap('not-verified')">Not verified</button>
+                    <button class="pill filter-verified" onclick="filterMap('verified')">Verified</button>
+                    <button class="pill filter-not-verified" onclick="filterMap('not-verified')">Not verified</button>
                 </div>
             </div>
             <button class="btn-find-near" onclick="triggerFindNearMe()">find near me</button>
